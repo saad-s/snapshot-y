@@ -1,24 +1,39 @@
-## snapshot-Y
+# Snapshot-Y
 Snapshot-X like solution for Solidity learning 
 
-
+## L1 chain only solution (Ethereum)
 
 ### Based on 
-	• Chain - Ethereum, Solidity, L2 Chain (TBD)
-	• UI - React, Ethers / Web3 (TBD)
+	• Chain - Ethereum, Solidity, Ganache, Truffle, Rinkyby testnet
+	• UI - React, Ethers Js
 
-### Must Haves 
-	• M2 - Users can create governance spaces - (strategies TBD)
+### UI - snapshot / console
+	• M2 - Users can create governance spaces 
+	• M1 - Users can add strategies to contracts 
 	• M1 - Users can manage proposals - CRUDS 
-	• M1 - Users can vote on proposals - (cost low/no TBD) (sponsored voting/ message signing)
-	• M1 - Users can verify votes on a proposal
-	• M1 - Results are anchored on L1 chain 
+	• M1 - Users can vote on proposals 
+	• M1 - Users can verify votes on a proposal 
 
 ### Arch 
-	• L2 contract factory per space
-	• L2 contract per proposal 
-	• L2 -> L1 messaging bridge for anchoring results 
+	• Contract factory per space
+	• Contract per proposal 
 	• IPFS storage for proposal data 
 
-### Unknowns 
-1. Allows classic ERC20 and ERC721 balances on L1 (thanks to Fossil) to be used as voting power
+### Contracts 
+	• Template contract with replaceable tags
+		○ Owner info 
+		○ Proposal uri 
+		○ Voting function
+		○ Start and end times / blocks
+		○ Upgradable contract 
+		○ Pause / delete 
+		○ Voting types - single choice - ranked choice 
+	• Strategies contracts with replaceable tags 
+		○ Eth 
+		○ ERC20 tokens 
+		○ ERC721 tokens 
+	• Tests for contracts 
+
+### Deployment 
+	• Testnets for contracts 
+	• Github / vercel / netlify
