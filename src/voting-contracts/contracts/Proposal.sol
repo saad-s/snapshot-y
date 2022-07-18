@@ -14,13 +14,13 @@ contract Proposal {
   ProposalDetails internal proposal;
   address private owner;
 
-  constructor(
+  function init(
     string memory _title, 
     string memory _uri, 
     string[] memory _options, 
     uint _startBlock, 
     uint _stopBlock
-  ) 
+  ) external 
   {
     owner = msg.sender;
     proposal = ProposalDetails(_title, _uri, _options, _startBlock, _stopBlock);

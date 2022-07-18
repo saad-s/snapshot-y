@@ -1,5 +1,5 @@
-const Proposal = artifacts.require("Proposal");
+const ProposalFactory = artifacts.require("ProposalFactory");
 
 module.exports = function (deployer) {
-  deployer.deploy(Proposal, 'Proposal', 'https://sample.com', ['yes', 'no', 'maybe'], 60000, 60500);
+  deployer.deploy(ProposalFactory);
 };
