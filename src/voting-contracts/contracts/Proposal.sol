@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.22 <0.9.0;
+pragma solidity 0.8.15;
 
 contract Proposal {
     enum VotingTypes {
@@ -8,12 +8,13 @@ contract Proposal {
     }
 
     struct ProposalDetails {
+        string guid;
         string title;
         string uri;
         string[] votingOptions; // TODO: set fixed length to 10
         uint256 startBlock;
         uint256 stopBlock;
-        VotingTypes votyingType;
+        VotingTypes votingType;
     }
 
     struct Vote {
@@ -24,36 +25,52 @@ contract Proposal {
 
     ProposalDetails internal proposal;
     address private owner;
+
+    bool private initialized;
+
     uint256 totalVotes;
 
     mapping(address => Vote) public votes;
     mapping(string => uint256) public optionCounts;
 
     error Unauthorized(string reason);
+    error AlreadyInitialized();
     error EditPeriodOver();
     error IncorrectParams(string reason);
     error VotingError(string reason);
 
     event VoteCast(address voter, string choice, uint256 votingPower);
 
+    /** 
+        init function to set proposal details 
+        NOTE: using init because clone factory 
+        requires it. 
+        TODO: use struct as param instead of elements
+    */
     function init(
         address _owner,
+        string memory _guid,
         string memory _title,
         string memory _uri,
         string[] memory _options,
         uint256 _startBlock,
         uint256 _stopBlock,
-        VotingTypes _votyingType
-    ) public {
+        VotingTypes _votingType
+    ) external {
+        if(initialized) {
+            revert AlreadyInitialized();
+        }
         owner = _owner;
         proposal = ProposalDetails(
+            _guid,
             _title,
             _uri,
             _options,
             _startBlock,
             _stopBlock,
-            _votyingType
+            _votingType
         );
+        initialized = true;
     }
 
     modifier onlyOwner(address sender) {
@@ -130,23 +147,25 @@ contract Proposal {
     }
 
     function updateProposalDetails(
+        string memory _guid,
         string memory _title,
         string memory _uri,
         string[] memory _options,
         uint256 _startBlock,
         uint256 _stopBlock,
-        VotingTypes _votyingType
+        VotingTypes _votingType
     ) external onlyOwner(msg.sender) isEditable {
         if (_startBlock < block.number || _startBlock > _stopBlock) {
             revert IncorrectParams("end > start > current");
         }
         proposal = ProposalDetails(
+            _guid,
             _title,
             _uri,
             _options,
             _startBlock,
             _stopBlock,
-            _votyingType
+            _votingType
         );
     }
 
