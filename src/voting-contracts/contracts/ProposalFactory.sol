@@ -6,34 +6,36 @@ import "../node_modules/@openzeppelin/contracts/proxy/Clones.sol";
 import "./Proposal.sol";
 
 contract ProposalFactory {
+    address private proposalImplementation;
 
-  address private proposalImplementation;
+    event CreatedProposal(address clonedProposal);
 
-  event createdProposal(address clonedProposal);
+    constructor() {
+        proposalImplementation = address(new Proposal());
+    }
 
-  constructor () {
-    proposalImplementation = address(new Proposal());
-  }
-
-
-  /** 
+    /** 
   create a new proposal with provided details
-  TODO: this contract is propagated as msg.sender, 
-    which is set as owner. Caller should be owner 
   */
-  function createProposal(
-    string memory _title, 
-    string memory _uri, 
-    string[] memory _options, 
-    uint _startBlock, 
-    uint _stopBlock
-  ) 
-    external 
-    returns(address) 
-  {
-    address clonedProposal = Clones.clone(proposalImplementation);
-    Proposal(clonedProposal).init(_title, _uri, _options, _startBlock, _stopBlock);
-    emit createdProposal(clonedProposal);
-    return clonedProposal;
-  }
+    function createProposal(
+        string memory _title,
+        string memory _uri,
+        string[] memory _options,
+        uint256 _startBlock,
+        uint256 _stopBlock,
+        Proposal.VotingTypes _votingType
+    ) external returns (address) {
+        address clonedProposal = Clones.clone(proposalImplementation);
+        Proposal(clonedProposal).init(
+            msg.sender,
+            _title,
+            _uri,
+            _options,
+            _startBlock,
+            _stopBlock,
+            _votingType
+        );
+        emit CreatedProposal(clonedProposal);
+        return clonedProposal;
+    }
 }
