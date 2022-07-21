@@ -1,6 +1,7 @@
 const Proposal = artifacts.require("Proposal");
-const { BN, expectRevert, time, snapshot } = require("@openzeppelin/test-helpers");
-const { expect } = require('chai');
+const { BN, expectRevert, time } = require("@openzeppelin/test-helpers");
+const expectEvent = require("@openzeppelin/test-helpers/src/expectEvent");
+const { web3 } = require("@openzeppelin/test-helpers/src/setup");
 
 contract("Proposal", function (accounts) {
 
@@ -35,7 +36,7 @@ contract("Proposal", function (accounts) {
       return assert.equal(owner, accounts[0])
     });
 
-    it('should be initialized only once', async () => {
+    it('can be initialized only once', async () => {
       await expectRevert.unspecified(this.proposal.init(
         accounts[1], 
         guid, 
@@ -49,7 +50,39 @@ contract("Proposal", function (accounts) {
     });
   });
 
-  describe('proposal details', () => {
+  describe('pause / unpause', () => {
+
+    it('only owner can pause / unpause proposal', async () => {
+      await expectRevert.unspecified(this.proposal.pauseContract({from: accounts[2]}));
+    });
+
+    it('proposal can be paused / unpaused', async () => {
+      const currentBlock = await web3.eth.getBlockNumber();
+      if(currentBlock > startBlock) {
+        console.log('** ERROR ** TEST NOT POSSIBLE - current block:', currentBlock, 'start block:', startBlock.toNumber());
+        return false;
+      }
+      
+      await this.proposal.pauseContract();
+      let state = await this.proposal.isPaused();
+      assert.equal(state, true);
+      
+      this.contractState = await this.proposal.unpauseContract();
+      state = await this.proposal.isPaused();
+      return assert.equal(state, false);
+    });
+
+    it('pause / unpause emits event', async () => {
+      const currentBlock = await web3.eth.getBlockNumber();
+      if (currentBlock > startBlock) {
+        console.log('** ERROR ** TEST NOT POSSIBLE - current block:', currentBlock, 'start block:', startBlock.toNumber());
+        return false
+      }
+      expectEvent(this.contractState, 'Unpaused', {account: accounts[0]});
+    });
+  });
+
+  describe('details', () => {
     // TODO: can be retrieved by calling `getProposalDetails`
 
     it('can only be updated by proposal owner', async () => {
@@ -64,31 +97,9 @@ contract("Proposal", function (accounts) {
         {from: accounts[2]}
       ));
     });
-
-    it('can only be updated before start block height is reached', async () => {
-      // get current snapshot of chain before moving chain tip forward 
-      const snapshotA = await snapshot();
-      let currentBlock = await web3.eth.getBlockNumber();
-      if (currentBlock < startBlock) {
-        // NOTE: this freezes ganache ui...
-        await time.advanceBlockTo(startBlock);
-      } 
-      await expectRevert.unspecified(this.proposal.updateProposalDetails(
-        guid, 
-        title, 
-        uri, 
-        votingOptions, 
-        startBlock, 
-        endBlock, 
-        Proposal.VotingTypes.SingleChoiceVoting
-      ));
-      // restore previous chain state to run further tests
-      await snapshotA.restore();
-      currentBlock = await web3.eth.getBlockNumber();
-    });
   });
 
-  describe ('proposal details utility function', () => {
+  describe ('details utility function', () => {
     
     const newTitle = "Updated Proposal title";
     const newURI = "https://sample.com/file2";
@@ -99,10 +110,8 @@ contract("Proposal", function (accounts) {
     it('should be able to update proposal details', async () => {
       const currentBlock = await web3.eth.getBlockNumber();
       if (currentBlock > startBlock) {
-        console.log('*NOTE* TEST NOT POSSIBLE * `should be able to update proposal details`')
-        console.log('*NOTE* current block is greater than start block');
-        console.log('*NOTE* to run this test, reset chain and make sure start block is greater than current block number');
-        return true
+        console.log('** ERROR ** TEST NOT POSSIBLE - current block:', currentBlock, 'start block:', startBlock.toNumber());
+        return 
       }
       await this.proposal.setProposalTitle(newTitle);
       await this.proposal.setProposalDetailsURI(newURI);
@@ -126,19 +135,67 @@ contract("Proposal", function (accounts) {
       await expectRevert.unspecified(this.proposal.setProposalDetailsURI(newURI, {from: accounts[2]}));
     });
 
+    
+  });
+
+});
+
+
+contract("Proposal", function (accounts) {
+  const guid = '0x1234567890ABCDEF';
+  const title = "Proposal";
+  const uri = "https://sample.com/file1";
+  const votingOptions = ['agree', 'disagree', 'abstain'];
+  const startBlock = new BN(200);
+  const endBlock = new BN(300);
+
+  describe('block height dependant tests..', () => {
+    before(async () => {
+      this.proposal = await Proposal.deployed();
+    });
+
+    before(async () => {
+      await this.proposal.init(
+        accounts[0], 
+        guid, 
+        title, 
+        uri, 
+        votingOptions, 
+        startBlock, 
+        endBlock, 
+        Proposal.VotingTypes.SingleChoiceVoting
+      );
+    });
+  });
+
+  describe ('details', () => {
+    it('can only be updated before start block height is reached', async () => {
+      let currentBlock = await web3.eth.getBlockNumber();
+      if (currentBlock < startBlock) {
+        // NOTE: this freezes ganache ui...
+        await time.advanceBlockTo(startBlock);
+      } 
+      await expectRevert.unspecified(this.proposal.updateProposalDetails(
+        guid, 
+        title, 
+        uri, 
+        votingOptions, 
+        startBlock, 
+        endBlock, 
+        Proposal.VotingTypes.SingleChoiceVoting
+      ));
+    });
+  });
+
+  describe ('details utility function', () => {
     it('only allowed to update before start block height is reached', async () => {
-      // get current snapshot of chain before moving chain tip forward 
-      const snapshotA = await snapshot();
+      const newURI = "https://sample.com/file2";
       let currentBlock = await web3.eth.getBlockNumber();
       if (currentBlock < startBlock) {
         // NOTE: this freezes ganache ui...
         await time.advanceBlockTo(startBlock);
       }
       await expectRevert.unspecified(this.proposal.setProposalDetailsURI(newURI));
-      // restore previous chain state to run further tests
-      await snapshotA.restore();
-      currentBlock = await web3.eth.getBlockNumber();
     });
   });
-
 });
