@@ -10,14 +10,16 @@ contract ProposalFactory {
 
     event CreatedProposal(address clonedProposal);
 
-    constructor() {
-        proposalImplementation = address(new Proposal());
+    constructor(address _implementation) {
+        // proposalImplementation = address(new Proposal());
+        proposalImplementation = _implementation;
     }
 
     /** 
-  create a new proposal with provided details
-  */
+        create a new proposal with provided details
+    */
     function createProposal(
+        string memory _guid,
         string memory _title,
         string memory _uri,
         string[] memory _options,
@@ -28,6 +30,7 @@ contract ProposalFactory {
         address clonedProposal = Clones.clone(proposalImplementation);
         Proposal(clonedProposal).init(
             msg.sender,
+            _guid,
             _title,
             _uri,
             _options,
