@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import '../node_modules/@openzeppelin/contracts/security/Pausable.sol';
+import "./IStrategies.sol";
+import "../node_modules/@openzeppelin/contracts/security/Pausable.sol";
 
 contract Proposal is Pausable {
     enum VotingTypes {
@@ -26,11 +27,13 @@ contract Proposal is Pausable {
     }
 
     ProposalDetails internal proposal;
+    IStrategies private strategies;
+
     address private owner;
 
     bool private initialized;
 
-    uint256 totalVotes;
+    uint256 private totalVotes;
 
     mapping(address => Vote) public votes;
     mapping(string => uint256) public optionCounts;
@@ -43,7 +46,7 @@ contract Proposal is Pausable {
 
     event VoteCast(address voter, string choice, uint256 votingPower);
 
-    constructor () Pausable() {}
+    constructor() Pausable() {}
 
     /** 
         init function to set proposal details 
@@ -53,25 +56,28 @@ contract Proposal is Pausable {
     */
     function init(
         address _owner,
+        address _strategiesContract,
         string memory _guid,
         string memory _title,
         string memory _uri,
         string[] memory _options,
-        uint256 _startBlock,
-        uint256 _stopBlock,
+        uint256 _startOffset,
+        uint256 _stopOffset,
         VotingTypes _votingType
     ) external {
-        if(initialized) {
+        if (initialized) {
             revert AlreadyInitialized();
         }
+        uint256 _startBlock = block.number + _startOffset;
         owner = _owner;
+        strategies = IStrategies(_strategiesContract);
         proposal = ProposalDetails(
             _guid,
             _title,
             _uri,
             _options,
             _startBlock,
-            _stopBlock,
+            _startBlock + _stopOffset,
             _votingType
         );
         initialized = true;
@@ -86,7 +92,7 @@ contract Proposal is Pausable {
 
     /// proposal details are editable till start block height is not reached
     modifier isEditable() {
-        if (proposal.startBlock < block.number) {
+        if (proposal.startBlock <= block.number) {
             revert EditPeriodOver();
         }
         _;
@@ -95,12 +101,12 @@ contract Proposal is Pausable {
     function pauseContract() external onlyOwner isEditable whenNotPaused {
         _pause();
     }
-    
+
     function unpauseContract() external onlyOwner whenPaused {
         _unpause();
     }
 
-    function isPaused() external view returns(bool) {
+    function isPaused() external view returns (bool) {
         return paused();
     }
 
@@ -113,15 +119,24 @@ contract Proposal is Pausable {
     function getProposalDetails()
         external
         view
-        returns (string memory, string memory, string memory, string[] memory, uint, uint, VotingTypes, bool)
+        returns (
+            string memory,
+            string memory,
+            string memory,
+            string[] memory,
+            uint256,
+            uint256,
+            VotingTypes,
+            bool
+        )
     {
         return (
-            proposal.guid, 
-            proposal.title, 
-            proposal.uri, 
-            proposal.votingOptions, 
-            proposal.startBlock, 
-            proposal.stopBlock, 
+            proposal.guid,
+            proposal.title,
+            proposal.uri,
+            proposal.votingOptions,
+            proposal.startBlock,
+            proposal.stopBlock,
             proposal.votingType,
             paused()
         );
@@ -153,21 +168,22 @@ contract Proposal is Pausable {
         external
         onlyOwner
         isEditable
+        returns (bool)
     {
         proposal.votingOptions = _options;
+        return true;
     }
 
     function setVotingPeriod(uint256 _start, uint256 _stop)
         external
         onlyOwner
         isEditable
+        returns (bool)
     {
-        require(
-            _start > block.number && _start < _stop,
-            "end > start > current"
-        );
+        checkVotingPeriod(_start, _stop);
         proposal.startBlock = _start;
         proposal.stopBlock = _stop;
+        return true;
     }
 
     function setVotingType(VotingTypes _votingType)
@@ -187,9 +203,7 @@ contract Proposal is Pausable {
         uint256 _stopBlock,
         VotingTypes _votingType
     ) external onlyOwner isEditable {
-        if (_startBlock < block.number || _startBlock > _stopBlock) {
-            revert IncorrectParams("end > start > current");
-        }
+        checkVotingPeriod(_startBlock, _stopBlock);
         proposal = ProposalDetails(
             _guid,
             _title,
@@ -201,19 +215,26 @@ contract Proposal is Pausable {
         );
     }
 
-    function castSingleChoiceVote(string memory _choice) external whenNotPaused {
-        if (!votes[msg.sender].hasVoted) {
+    function castSingleChoiceVote(string memory _choice)
+        external
+        whenNotPaused
+    {
+        if (votes[msg.sender].hasVoted) {
             revert VotingError("Already Voted");
         }
 
-        if (indexOfVotingOptions(_choice) > -1) {
+        if (indexOfVotingOptions(_choice) < 0) {
             revert VotingError("Wrong voting option");
         }
-        if (!isVotingPeriodActive()) {
-            revert VotingError("Voting period over");
+        if (isVotingPeriodNotActive()) {
+            revert VotingError("Voting period not active");
         }
-        //TODO: Create voting strategies for caclulating power
-        uint256 power = 0;
+
+        bool canVote = strategies.evaluateGatingStrategies(msg.sender);
+        if (!canVote) {
+            revert VotingError("Not eligible for voting");
+        }
+        uint256 power = strategies.evaluateVotingPower(msg.sender);
         votes[msg.sender] = Vote(_choice, power, true);
         optionCounts[_choice] += power;
         totalVotes += power;
@@ -236,8 +257,14 @@ contract Proposal is Pausable {
         return -1;
     }
 
-    function isVotingPeriodActive() private view returns (bool) {
+    function isVotingPeriodNotActive() private view returns (bool) {
         return (block.number < proposal.startBlock ||
             block.number > proposal.stopBlock);
+    }
+
+    function checkVotingPeriod(uint256 _start, uint256 _stop) private view {
+        if (_start < block.number || _start > _stop) {
+            revert IncorrectParams("Must be end > start > current");
+        }
     }
 }
