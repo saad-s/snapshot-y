@@ -19,23 +19,25 @@ contract ProposalFactory {
         create a new proposal with provided details
     */
     function createProposal(
+        address _strategiesContract,
         string memory _guid,
         string memory _title,
         string memory _uri,
         string[] memory _options,
-        uint256 _startBlock,
-        uint256 _stopBlock,
+        uint256 _startOffset,
+        uint256 _stopOffset,
         Proposal.VotingTypes _votingType
     ) external returns (address) {
         address clonedProposal = Clones.clone(proposalImplementation);
         Proposal(clonedProposal).init(
             msg.sender,
+            _strategiesContract,
             _guid,
             _title,
             _uri,
             _options,
-            _startBlock,
-            _stopBlock,
+            _startOffset,
+            _stopOffset,
             _votingType
         );
         emit CreatedProposal(clonedProposal);
