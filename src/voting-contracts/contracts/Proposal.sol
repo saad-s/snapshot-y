@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 contract Proposal {
     enum VotingTypes {
         SingleChoiceVoting,
-        RankedVoting
+        RankedChoiceVoting
     }
 
     struct ProposalDetails {
@@ -97,10 +97,17 @@ contract Proposal {
     function getProposalDetails()
         external
         view
-        returns (ProposalDetails memory)
+        returns (string memory, string memory, string memory, string[] memory, uint, uint, VotingTypes)
     {
-        // TODO: what's the best practice in returning structs?? JSON friendliness...
-        return proposal;
+        return (
+            proposal.guid, 
+            proposal.title, 
+            proposal.uri, 
+            proposal.votingOptions, 
+            proposal.startBlock, 
+            proposal.stopBlock, 
+            proposal.votingType
+        );
     }
 
     function setProposalTitle(string memory _title)
@@ -144,6 +151,14 @@ contract Proposal {
         );
         proposal.startBlock = _start;
         proposal.stopBlock = _stop;
+    }
+
+    function setVotingType(VotingTypes _votingType)
+        external
+        onlyOwner(msg.sender)
+        isEditable
+    {
+        proposal.votingType = _votingType;
     }
 
     function updateProposalDetails(
