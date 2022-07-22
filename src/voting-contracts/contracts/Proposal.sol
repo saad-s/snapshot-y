@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-contract Proposal {
+import '../node_modules/@openzeppelin/contracts/security/Pausable.sol';
+
+contract Proposal is Pausable {
     enum VotingTypes {
         SingleChoiceVoting,
         RankedChoiceVoting
@@ -41,6 +43,8 @@ contract Proposal {
 
     event VoteCast(address voter, string choice, uint256 votingPower);
 
+    constructor () Pausable() {}
+
     /** 
         init function to set proposal details 
         NOTE: using init because clone factory 
@@ -73,8 +77,8 @@ contract Proposal {
         initialized = true;
     }
 
-    modifier onlyOwner(address sender) {
-        if (owner != sender) {
+    modifier onlyOwner() {
+        if (owner != msg.sender) {
             revert Unauthorized("Only owner");
         }
         _;
@@ -88,6 +92,18 @@ contract Proposal {
         _;
     }
 
+    function pauseContract() external onlyOwner isEditable whenNotPaused {
+        _pause();
+    }
+    
+    function unpauseContract() external onlyOwner whenPaused {
+        _unpause();
+    }
+
+    function isPaused() external view returns(bool) {
+        return paused();
+    }
+
     /// returns owner / deployer address
     function getOwner() external view returns (address) {
         return owner;
@@ -97,7 +113,7 @@ contract Proposal {
     function getProposalDetails()
         external
         view
-        returns (string memory, string memory, string memory, string[] memory, uint, uint, VotingTypes)
+        returns (string memory, string memory, string memory, string[] memory, uint, uint, VotingTypes, bool)
     {
         return (
             proposal.guid, 
@@ -106,13 +122,14 @@ contract Proposal {
             proposal.votingOptions, 
             proposal.startBlock, 
             proposal.stopBlock, 
-            proposal.votingType
+            proposal.votingType,
+            paused()
         );
     }
 
     function setProposalTitle(string memory _title)
         external
-        onlyOwner(msg.sender)
+        onlyOwner
         isEditable
     {
         proposal.title = _title;
@@ -120,7 +137,7 @@ contract Proposal {
 
     function setProposalDetailsURI(string memory _uri)
         external
-        onlyOwner(msg.sender)
+        onlyOwner
         isEditable
         returns (bool)
     {
@@ -134,7 +151,7 @@ contract Proposal {
 
     function setVotingOptions(string[] memory _options)
         external
-        onlyOwner(msg.sender)
+        onlyOwner
         isEditable
     {
         proposal.votingOptions = _options;
@@ -142,7 +159,7 @@ contract Proposal {
 
     function setVotingPeriod(uint256 _start, uint256 _stop)
         external
-        onlyOwner(msg.sender)
+        onlyOwner
         isEditable
     {
         require(
@@ -155,7 +172,7 @@ contract Proposal {
 
     function setVotingType(VotingTypes _votingType)
         external
-        onlyOwner(msg.sender)
+        onlyOwner
         isEditable
     {
         proposal.votingType = _votingType;
@@ -169,7 +186,7 @@ contract Proposal {
         uint256 _startBlock,
         uint256 _stopBlock,
         VotingTypes _votingType
-    ) external onlyOwner(msg.sender) isEditable {
+    ) external onlyOwner isEditable {
         if (_startBlock < block.number || _startBlock > _stopBlock) {
             revert IncorrectParams("end > start > current");
         }
@@ -184,7 +201,7 @@ contract Proposal {
         );
     }
 
-    function castSingleChoiceVote(string memory _choice) public {
+    function castSingleChoiceVote(string memory _choice) external whenNotPaused {
         if (!votes[msg.sender].hasVoted) {
             revert VotingError("Already Voted");
         }
